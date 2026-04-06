@@ -5,80 +5,70 @@
 #include <string.h>
 #include "common.h"
 
-float get_cpu() { 
-    return (float)(rand() % 100); 
+float get_cpu() {
+    return (float)(rand() % 100);
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 2) { 
-        printf("Usage: %s <server_ip>\n", argv[0]); 
-        return 1; 
+    if (argc < 2) {
+        printf("Usage: %s <server_ip>\n", argv[0]);
+        return 1;
     }
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
+
     struct sockaddr_in server = {
-        .sin_family = AF_INET, 
+        .sin_family = AF_INET,
         .sin_port = htons(PORT)
     };
-    
+
     inet_pton(AF_INET, argv[1], &server.sin_addr);
-    
+
     if (connect(sock, (struct sockaddr*)&server, sizeof(server)) < 0) {
         perror("Connect failed");
         return 1;
     }
 
-    printf("[Worker] Registered with Server at %s\n", argv[1]);
-    fflush(stdout); // Force text to show in terminal
+    printf("[Worker] Connected to server\n");
 
     while (1) {
-        // Send CPU update
+        // Send CPU usage
         float cpu = get_cpu();
         send_msg(sock, MSG_CPU, &cpu, sizeof(cpu));
 
-        fd_set set;
-        struct timeval tv = {1, 0}; // 1 second timeout
-        FD_ZERO(&set);
-        FD_SET(sock, &set);
+        sleep(1);
 
-        int rv = select(sock + 1, &set, NULL, NULL, &tv);
+        Header h;
+        if (recv_all(sock, &h, sizeof(h)) < 0) break;
 
-        if (rv > 0) {
-            Header h;
-            if (recv_all(sock, &h, sizeof(h)) < 0) break;
+        if (h.type == MSG_JOB) {
+            printf("[Worker] Job received\n");
 
-            if (h.type == MSG_JOB) {
-                printf("\n[Worker] *** JOB RECEIVED FROM SERVER ***\n");
-                printf("[Worker] Binary size: %d bytes\n", h.length);
-                fflush(stdout);
+            char *bin = malloc(h.length);
+            recv_all(sock, bin, h.length);
 
-                char *bin = malloc(h.length);
-                recv_all(sock, bin, h.length);
+            FILE *f = fopen("remote_job", "wb");
+            fwrite(bin, 1, h.length, f);
+            fclose(f);
+            free(bin);
 
-                // Save and execute
-                FILE *f = fopen("remote_job", "wb");
-                fwrite(bin, 1, h.length, f);
-                fclose(f);
-                free(bin);
+            system("chmod +x remote_job");
 
-                system("chmod +x remote_job");
+            FILE *fp = popen("./remote_job", "r");
+            char output[MAX_BUF] = {0};
+            int total = 0;
 
-                printf("[Worker] Running binary...\n");
-                fflush(stdout);
-
-                FILE *fp = popen("./remote_job", "r");
-                char output[MAX_BUF] = {0};
-                fread(output, 1, sizeof(output), fp);
-                pclose(fp);
-
-                printf("[Worker] Execution finished. Sending result.\n");
-                fflush(stdout);
-
-                send_msg(sock, MSG_RESULT, output, strlen(output));
+            while (fgets(output + total, sizeof(output) - total, fp) != NULL) {
+                total = strlen(output);
             }
+
+            pclose(fp);
+
+            printf("[Worker] Sending result\n");
+
+            send_msg(sock, MSG_RESULT, output, strlen(output));
         }
     }
 
     close(sock);
-    return 0;
 }
