@@ -1,6 +1,6 @@
 # ⚡ Distributed Execution System (Smart Worker Selection)
 
-> 🚀 Execute programs across multiple machines with **intelligent load balancing** based on real-time CPU performance.
+> 🚀 Execute programs across multiple machines with **intelligent load balancing** based on real-time system performance.
 
 ---
 
@@ -8,79 +8,92 @@
 
 🔥 **Smart Worker Selection**
 
-* Automatically selects the best worker based on:
+* Chooses the best worker dynamically using:
 
   * CPU usage 📊
   * Number of cores 🧠
-* Uses score = `CPU / Cores` for optimal decision
+* Score formula:
+
+  ```
+  Score = CPU / Cores
+  ```
 
 🌐 **Distributed Execution**
 
-* Send executable/code from client → worker
+* Client sends executable → worker
 * Worker compiles & runs remotely
 
 ⚙️ **Real-Time Monitoring**
 
-* Workers dynamically report system load
+* Workers report system stats on demand
 
-📡 **Socket Programming (C)**
+📡 **Low-Level Networking**
 
-* Built using low-level TCP sockets
+* Built using TCP sockets in C
 
 ---
 
 ## 🧠 Architecture
 
 ```
-        ┌────────────┐
-        │   Client   │
-        └─────┬──────┘
-              │
-   ┌──────────┼──────────┐
-   │          │          │
-┌───────┐ ┌───────┐ ┌───────┐
-│Worker1│ │Worker2│ │Worker3│
-└───────┘ └───────┘ └───────┘
+                ┌────────────┐
+                │   Client   │
+                └─────┬──────┘
+                      │
+        ┌─────────────┼─────────────┐
+        │             │             │
+     ┌───────┐    ┌───────┐    ┌───────┐   ...   ┌────────┐
+     │Worker1│    │Worker2│    │Worker3│         │Worker N│
+     └───────┘    └───────┘    └───────┘         └────────┘
 ```
+
+---
+
+### 🔁 Execution Flow
+
+1. Client queries **all available workers**
+2. Each worker returns:
+
+   * CPU usage
+   * Number of cores
+3. Client computes score for each worker
+4. Best worker is selected dynamically 🔥
+5. Client sends executable
+6. Worker compiles, executes, and returns output
 
 ---
 
 ## 📂 Project Structure
 
-* `client.c` → Selects best worker & sends task 
-* `server.c` → Worker node handling execution 
-* `common.h` → Shared structures 
-* `test.c` → Sample program executed remotely 
+* `client.c` → Selects best worker & sends task
+* `server.c` → Worker node handling execution
+* `common.h` → Shared structures
+* `test.c` → Sample program executed remotely
 * `Makefile` → Build automation
 
 ---
 
-## ⚙️ How It Works
+## ⚙️ How It Works (Under the Hood)
 
-### 1️⃣ Client checks workers
+### 🧠 Worker Side
 
-* Sends `"LOAD"` request
-* Receives:
+* Uses system commands to fetch:
 
-  * CPU usage
-  * Number of cores
+  * CPU load (`top`)
+  * Core count (`nproc`)
+* Responds to `"LOAD"` requests with stats
+* Receives executable, compiles & runs it
 
-### 2️⃣ Score Calculation
+### 💻 Client Side
 
-```
-Score = CPU / Cores
-```
+* Connects to multiple workers
+* Computes:
 
-### 3️⃣ Best worker selected 🔥
-
-### 4️⃣ Execution flow
-
-* Client sends executable
-* Worker:
-
-  * Compiles it
-  * Executes it
-  * Sends output back
+  ```
+  score = cpu / cores
+  ```
+* Picks lowest score worker
+* Sends executable and receives output
 
 ---
 
@@ -94,11 +107,12 @@ make
 
 ---
 
-### 🖥️ Start Workers (on different PCs)
+### 🖥️ Start Workers (on different machines)
 
 ```bash
 ./server 8080
 ./server 8081
+./server 8082
 ```
 
 ---
@@ -113,9 +127,9 @@ make
 
 ## 🌐 Network Setup
 
-Make sure all systems are on the **same network**.
+All machines must be on the **same network**.
 
-Example:
+### Example:
 
 ```
 PC1 → 192.168.1.10
@@ -123,10 +137,14 @@ PC2 → 192.168.1.11
 PC3 → 192.168.1.12
 ```
 
-Update worker IPs inside `client.c`:
+Update worker IPs in `client.c`:
 
 ```c
-char *workers[] = {"192.168.1.10", "192.168.1.11"};
+char *workers[] = {
+    "192.168.1.10",
+    "192.168.1.11",
+    "192.168.1.12"
+};
 ```
 
 ---
@@ -135,6 +153,8 @@ char *workers[] = {"192.168.1.10", "192.168.1.11"};
 
 ```
 Worker 8080 -> CPU: 3.80% | Cores: 16 | Score: 0.24
+Worker 8081 -> CPU: 12.50% | Cores: 8  | Score: 1.56
+
 🔥 Selected worker at port 8080
 
 ===== OUTPUT =====
@@ -143,14 +163,32 @@ Hello World!
 
 ---
 
+## 🚀 Scalability
 
-## 🧑‍💻 Tech Stack
+✔ Add more workers → system automatically improves
+✔ No central scheduler needed
+✔ Horizontal scaling supported
 
-* C Programming 🧵
-* POSIX Sockets 🌐
-* Linux System Calls 🐧
+> Just plug in a new machine and add its IP 🔥
 
 ---
 
+## ⚠️ Requirements
+
+* Linux OS 🐧
+* GCC Compiler
+* Same network connectivity
+
+---
+
+
+
+## 🧑‍💻 Tech Stack
+
+* C Programming
+* POSIX Sockets
+* Linux System Calls
+
+---
 
 
